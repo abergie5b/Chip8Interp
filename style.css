@@ -1,0 +1,26 @@
+html,
+body {
+    background-color: black;
+}
+
+canvas {
+    top: 20%;
+    left: 40%;
+    position: absolute;
+    border: 2px solid black;
+}
+
+#keypad {
+    right: 0;
+    bottom: 0;
+    margin: 2%;
+    position: absolute;
+    border: 2px solid white;
+    color:white;
+    cursor: pointer;
+}
+
+.keypad-button:hover {
+   background-color: lightgray; 
+}
+
