@@ -1,9 +1,9 @@
 // rendering
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
-const columns = 64;
-const rows = 32;
-const scale = 10;
+const columns = 128;
+const rows = 64;
+const scale = 8;
 
 let display = new Array(columns * rows);
 const setPixel = (x, y) => {
@@ -38,7 +38,7 @@ const render = () => {
 }
 
 // input
-const keysPressed = [];
+let keysPressed = [];
 let onNextKeyPress = null;
 const keyMap = {
     49: 0x1, // 1
@@ -79,9 +79,9 @@ const onKeyUp = event => {
 }
 
 // cpu
-const memory = new Uint8Array(4096);
-const registers = new Uint8Array(16);
-const stack = [];
+let memory = new Uint8Array(4096);
+let registers = new Uint8Array(16);
+let stack = [];
 let instruction = 0;
 let counter = 0x200;
 let paused = false;
@@ -92,9 +92,8 @@ let soundTimer = 0;
 
 // audio
 const AudioContext = window.AudioContext || window.webkitAudioContext;
-const audioCtx = new AudioContext();
-const audioGain = audioCtx.createGain();
-audioGain.connect(audioCtx.destination);
+let audioCtx = null;
+let audioGain = null;
 let oscillator = null;
 
 // chip8
@@ -150,7 +149,12 @@ const cycle = () => {
     }
 
     if (soundTimer > 0) {
-      if (audioCtx && !oscillator) {
+      if (audioCtx == null) {
+        audioCtx = new AudioContext();
+        audioGain = audioCtx.createGain();
+        audioGain.connect(audioCtx.destination);
+      }
+      if (audioCtx != null && oscillator == null) {
         oscillator = audioCtx.createOscillator();
         oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
         oscillator.type = 'square';
@@ -159,7 +163,7 @@ const cycle = () => {
       }
     }
     else {
-      if (oscillator) {
+      if (oscillator != null) {
         oscillator.stop();
         oscillator.disconnect();
         oscillator = null;
@@ -359,17 +363,17 @@ const execute = opcode => {
     }
 }
 
-const run = () => {
-    const fps = 120;
-    const fpsInt = 1000 / fps;
+const start = () => {
+    const fps = 60;
 
-    let lastFrame = 0;
-    let loop = timestamp => {
-        if (timestamp - lastFrame > fpsInt) {
+    let lastFrame = Date.now();
+    let loop = () => {
+        const now = Date.now();
+        if (now - lastFrame > 1000 / fps) {
             cycle();
             render();
+            lastFrame = Date.now();
         }
-        lastFrame = timestamp;
         requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
@@ -377,6 +381,16 @@ const run = () => {
 
 window.addEventListener('keydown', onKeyDown, false);
 window.addEventListener('keyup', onKeyUp, false);
+
+const addOptionToSelect = (select, value)  => {
+    let option = document.createElement('option');
+    option.value = value;
+    option.innerHTML = value;
+    option.onclick = e => {
+      run(e.target.innerHTML);
+    }
+    select.appendChild(option);
+}
 
 const makeKeypad  = () => {
     const table = document.createElement('table');
@@ -395,26 +409,61 @@ const makeKeypad  = () => {
         }
     }
     document.getElementById('keypad').appendChild(table);
+
+    const select = document.createElement('select');
+    
+    addOptionToSelect(select, 'BLINKY')
+    addOptionToSelect(select, 'PONG')
+    addOptionToSelect(select, 'MAZE')
+    addOptionToSelect(select, 'MISSILE')
+    addOptionToSelect(select, 'TANK')
+    addOptionToSelect(select, 'UFO')
+    addOptionToSelect(select, 'TETRIS')
+    addOptionToSelect(select, 'BLITZ')
+    addOptionToSelect(select, 'CONNECT4')
+    addOptionToSelect(select, 'INVADERS')
+    addOptionToSelect(select, 'test_opcode.ch8')
+
+    document.getElementById('keypad').appendChild(select);
+
 }
 
-window.onload = () => {
-    canvas.width = columns * scale;
-    canvas.height = rows * scale;
-    makeKeypad();
+const run = rom => {
+    // reset everything
+    display = new Array(columns * rows);
 
-    fetch('roms/BLINKY')
+    memory = new Uint8Array(4096);
+    registers = new Uint8Array(16);
+
+    stack = [];
+    instruction = 0;
+    counter = 0x200;
+    paused = false;
+
+    keysPressed = [];
+    onNextKeyPress = null;
+  
+    delayTimer = 0;
+    soundTimer = 0;
+
+    oscillator = null;
+
+    fetch(`roms/${rom}`)
         .then(r => {
             return r.arrayBuffer();
         })
     .then(arr => {
         loadSpritesIntoMemory();
         const rom = new Uint8Array(arr);
-        localStorage['rom'] = rom;
         loadRomIntoMemory(rom);
-        localStorage['ch8'] = memory;
     }).then(() => {
-        run();
+        start();
     });
+}
 
+window.onload = () => {
+    canvas.width = columns * scale;
+    canvas.height = rows * scale;
+    makeKeypad();
 }
 
